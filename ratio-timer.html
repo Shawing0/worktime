@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<meta name="theme-color" content="#0e0e0e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Ratio Timer">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>Ratio Timer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+:root {
+  color-scheme: dark;
+  --bg:#0e0e0e; --surface:#1a1a1a; --s2:#242424; --border:#2e2e2e;
+  --work:#e8ff47; --brk:#47d4ff; --stop:#ff4747; --resume:#a78bfa;
+  --text:#f0f0f0; --muted:#555;
+  --mono:'Space Mono',monospace; --disp:'Bebas Neue',sans-serif;
+}
+body.light {
+  --bg:#f0f0ec; --surface:#ffffff; --s2:#f5f5f0; --border:#dcdcd6;
+  --text:#1a1a1a; --muted:#999;
+}
+/* settings gear */
+.settings-btn{position:fixed;top:18px;right:18px;background:var(--surface);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:1rem;color:var(--muted);transition:color .2s,border-color .2s,transform .3s;z-index:200;}
+.settings-btn:hover{color:var(--text);border-color:var(--text);}
+.settings-btn.spinning{transform:rotate(180deg);}
+/* settings panel */
+.settings-panel{position:fixed;top:60px;right:18px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:16px 20px;z-index:200;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none;min-width:200px;}
+.settings-panel.open{display:block;}
+.settings-title{font-size:.58rem;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;}
+.settings-lbl{font-size:.62rem;letter-spacing:3px;text-transform:uppercase;color:var(--text);}
+.theme-toggle{display:flex;background:var(--s2);border:1px solid var(--border);border-radius:20px;overflow:hidden;}
+.theme-opt{padding:5px 12px;font-size:.58rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;color:var(--muted);transition:background .15s,color .15s;font-family:var(--mono);}
+.theme-opt.on{background:var(--work);color:#0e0e0e;font-weight:700;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{background:#0e0e0e;}
+body{background:var(--bg);color:var(--text);font-family:var(--mono);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 60px;}
+
+/* Header */
+.hdr{text-align:center;margin-bottom:20px;}
+.hdr h1{font-family:var(--disp);font-size:3.2rem;letter-spacing:4px;line-height:1;background:linear-gradient(135deg,var(--work),var(--brk));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.hdr .sub{font-size:.65rem;letter-spacing:5px;color:var(--muted);text-transform:uppercase;margin-top:4px;}
+
+/* Tabs */
+.tabs{display:flex;width:100%;max-width:480px;margin-bottom:16px;border:1px solid var(--border);border-radius:6px;overflow:hidden;}
+.tab{flex:1;padding:10px;background:transparent;border:none;font-family:var(--mono);font-size:.65rem;font-weight:700;letter-spacing:4px;text-transform:uppercase;color:var(--muted);cursor:pointer;transition:background .2s,color .2s;}
+.tab:first-child{border-right:1px solid var(--border);}
+.tab.on{background:var(--surface);color:var(--text);}
+.tab:not(.on):hover{background:var(--s2);color:var(--text);}
+.panel{display:none;width:100%;max-width:480px;flex-direction:column;gap:16px;}
+.panel.on{display:flex;}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:6px;width:100%;padding:24px;}
+
+/* ── Ratio Timer ── */
+.status-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;}
+.sbadge{display:flex;align-items:center;gap:8px;font-size:.7rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);transition:color .3s;}
+.sbadge.wrk{color:var(--work);} .sbadge.brk{color:var(--brk);}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--muted);transition:background .3s;}
+.sbadge.wrk .sdot{background:var(--work);animation:pw 1s ease-in-out infinite;}
+.sbadge.brk .sdot{background:var(--brk);animation:pb 1s ease-in-out infinite;}
+@keyframes pw{0%,100%{box-shadow:0 0 0 0 rgba(232,255,71,.5)}50%{box-shadow:0 0 0 6px rgba(232,255,71,0)}}
+@keyframes pb{0%,100%{box-shadow:0 0 0 0 rgba(71,212,255,.5)}50%{box-shadow:0 0 0 6px rgba(71,212,255,0)}}
+.rbadge{font-family:var(--disp);font-size:1.2rem;letter-spacing:2px;color:var(--muted);}
+.rbadge .rw{color:var(--work);} .rbadge .rb{color:var(--brk);}
+.fpill{font-size:.62rem;letter-spacing:2px;color:var(--work);border:1px solid rgba(232,255,71,.3);padding:3px 9px;border-radius:20px;margin-left:10px;opacity:0;transition:opacity .3s;}
+.fpill.on{opacity:1;}
+
+.timers{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;}
+.tblock{background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:16px;transition:border-color .3s;}
+.tblock.aw{border-color:var(--work);} .tblock.ab{border-color:var(--brk);}
+.tblock .lbl{font-size:.6rem;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.tblock.aw .lbl{color:var(--work);} .tblock.ab .lbl{color:var(--brk);}
+.tblock .tim{font-family:var(--disp);font-size:2.4rem;letter-spacing:2px;line-height:1;}
+.tblock.aw .tim{color:var(--work);} .tblock.ab .tim{color:var(--brk);}
+
+.bar-sec{margin-bottom:20px;}
+.bar-lr{display:flex;justify-content:space-between;font-size:.6rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:8px;}
+.btrack{height:36px;background:var(--s2);border:1px solid var(--border);border-radius:3px;overflow:hidden;display:flex;}
+.bw{height:100%;background:var(--work);transition:width .5s;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;min-width:0;overflow:hidden;}
+.bb{height:100%;background:var(--brk);transition:width .5s;display:flex;align-items:center;justify-content:flex-start;padding-left:6px;overflow:hidden;}
+.bw .bp,.bb .bp{font-size:.6rem;font-weight:700;color:#0e0e0e;letter-spacing:1px;white-space:nowrap;opacity:0;transition:opacity .3s;}
+.bw.has .bp,.bb.has .bp{opacity:1;}
+
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
+.btns3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;}
+.btn{padding:14px;border:2px solid;border-radius:4px;font-family:var(--mono);font-size:.75rem;font-weight:700;letter-spacing:4px;text-transform:uppercase;cursor:pointer;background:transparent;transition:background .15s,transform .1s,box-shadow .15s;}
+.btn:active{transform:scale(.97);} .btn:disabled{opacity:.3;cursor:not-allowed;} .btn:disabled:active{transform:none;}
+.bw-btn{border-color:var(--work);color:var(--work);}
+.bw-btn:not(:disabled):hover{background:var(--work);color:#0e0e0e;box-shadow:0 0 20px rgba(232,255,71,.3);}
+.bw-btn.on{background:var(--work);color:#0e0e0e;box-shadow:0 0 24px rgba(232,255,71,.4);}
+.bb-btn{border-color:var(--brk);color:var(--brk);}
+.bb-btn:not(:disabled):hover{background:var(--brk);color:#0e0e0e;box-shadow:0 0 20px rgba(71,212,255,.3);}
+.bb-btn.on{background:var(--brk);color:#0e0e0e;box-shadow:0 0 24px rgba(71,212,255,.4);}
+.bs-btn{border-color:var(--stop);color:var(--stop);padding:12px;font-size:.7rem;letter-spacing:3px;}
+.bs-btn:not(:disabled):hover{background:var(--stop);color:#fff;box-shadow:0 0 20px rgba(255,71,71,.3);}
+.br-btn{border-color:var(--resume);color:var(--resume);padding:12px;font-size:.7rem;letter-spacing:3px;}
+.br-btn:not(:disabled):hover{background:var(--resume);color:#0e0e0e;}
+.brs-btn{border-color:var(--border);color:var(--muted);padding:12px;font-size:.7rem;letter-spacing:3px;}
+.brs-btn:not(:disabled):hover{border-color:var(--text);color:var(--text);}
+.rhint{text-align:center;font-size:.6rem;letter-spacing:2px;color:var(--resume);text-transform:uppercase;margin-top:8px;opacity:0;transition:opacity .4s;pointer-events:none;}
+.rhint.on{opacity:1;}
+
+/* Session history */
+.hhdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.hhdr h2{font-family:var(--disp);font-size:1.2rem;letter-spacing:3px;color:var(--muted);}
+.hcnt{font-size:.6rem;letter-spacing:2px;color:var(--muted);border:1px solid var(--border);padding:3px 8px;border-radius:20px;}
+.empty{text-align:center;padding:24px 0;font-size:.65rem;letter-spacing:3px;color:var(--muted);text-transform:uppercase;}
+.slist{display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.sitem{background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;animation:si .3s ease;}
+@keyframes si{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.sdate{font-size:.6rem;letter-spacing:2px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;}
+.stimes{display:flex;gap:16px;font-size:.7rem;}
+.sw{color:var(--work);} .sbk{color:var(--brk);}
+.srat{font-family:var(--disp);font-size:1.1rem;letter-spacing:1px;color:var(--muted);text-align:right;}
+.sfoc{font-size:.68rem;color:var(--work);letter-spacing:2px;font-weight:700;}
+.smbar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:6px;display:flex;}
+.smw{background:var(--work);height:100%;} .smb{background:var(--brk);height:100%);}
+.clr-btn{font-family:var(--mono);font-size:.6rem;letter-spacing:2px;color:var(--muted);background:none;border:none;cursor:pointer;text-transform:uppercase;padding:4px;transition:color .2s;}
+.clr-btn:hover{color:var(--stop);}
+
+/* ══ Pomodoro Card ══ */
+.pcard{background:var(--surface);border:1px solid var(--border);border-radius:6px;width:100%;overflow:hidden;position:relative;}
+.pcard.phase-work{border-color:rgba(232,255,71,.3);}
+.pcard.phase-break{border-color:rgba(71,212,255,.3);}
+.pcard.phase-longbreak{border-color:rgba(167,139,250,.3);}
+
+/* top bar */
+.pbar{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 0;}
+.ptoggle-wrap{display:flex;align-items:center;gap:8px;}
+.ptog-lbl{font-size:.58rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);}
+.ptog{position:relative;width:36px;height:20px;flex-shrink:0;}
+.ptog input{opacity:0;width:0;height:0;position:absolute;}
+.ptog-sl{position:absolute;inset:0;background:var(--s2);border:1px solid var(--border);border-radius:20px;cursor:pointer;transition:background .2s,border-color .2s;}
+.ptog-sl::before{content:'';position:absolute;width:12px;height:12px;left:3px;top:3px;background:var(--muted);border-radius:50%;transition:transform .2s,background .2s;}
+.ptog input:checked + .ptog-sl{background:rgba(232,255,71,.12);border-color:rgba(232,255,71,.35);}
+.ptog input:checked + .ptog-sl::before{transform:translateX(16px);background:var(--work);}
+
+/* three-dot menu button */
+.pdots-btn{background:none;border:none;cursor:pointer;padding:6px 8px;border-radius:4px;color:var(--muted);font-size:1.1rem;line-height:1;transition:color .2s,background .2s;}
+.pdots-btn:hover{color:var(--text);background:var(--s2);}
+
+/* inline accordion menu */
+.pmenu{background:#1a1a1a;border-top:1px solid var(--border);display:none;overflow:hidden;}
+.pmenu.open{display:block;}
+.pmenu-section{border-bottom:1px solid var(--border);}
+.pmenu-section:last-child{border-bottom:none;}
+.pmenu-row{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;font-size:.65rem;letter-spacing:3px;text-transform:uppercase;cursor:pointer;color:var(--text);transition:background .15s;user-select:none;}
+.pmenu-row:hover{background:var(--s2);}
+.pmenu-row .cur-val{color:var(--work);font-size:.6rem;}
+.pmenu-arrow{font-size:.75rem;color:var(--muted);transition:transform .2s;}
+.pmenu-row.open .pmenu-arrow{transform:rotate(90deg);}
+.pmenu-opts{display:none;background:var(--s2);padding:4px 0;}
+.pmenu-opts.open{display:block;}
+.pmenu-opt{display:flex;align-items:center;justify-content:space-between;padding:9px 28px;font-size:.62rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;color:var(--muted);transition:background .15s,color .15s;}
+.pmenu-opt:hover{background:var(--border);color:var(--text);}
+.pmenu-opt.chosen{color:var(--work);}
+.pmenu-opt .chk{opacity:0;font-size:.7rem;}
+.pmenu-opt.chosen .chk{opacity:1;}
+
+/* countdown display */
+.pcountdown{padding:28px 20px 8px;text-align:center;}
+.pphase-lbl{font-size:.65rem;letter-spacing:5px;text-transform:uppercase;color:var(--muted);margin-bottom:10px;transition:color .3s;}
+.pphase-lbl.work{color:var(--work);} .pphase-lbl.brk{color:var(--brk);} .pphase-lbl.lbrk{color:var(--resume);}
+.ptime{font-family:var(--disp);font-size:5rem;letter-spacing:4px;line-height:1;transition:color .3s;}
+.ptime.work{color:var(--work);} .ptime.brk{color:var(--brk);} .ptime.lbrk{color:var(--resume);}
+.pdisabled-overlay{font-size:.65rem;letter-spacing:4px;text-transform:uppercase;color:var(--muted);padding:32px 20px;text-align:center;}
+
+/* round dots */
+.pdots{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px 0 4px;}
+.pdot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background .4s,transform .3s;}
+.pdot.done{background:var(--work);}
+.pdot.active{background:var(--work);transform:scale(1.3);}
+.pdot.lbrk-done{background:var(--resume);}
+
+/* pomo start/stop */
+.pomo-play-row{display:flex;justify-content:center;gap:10px;padding:12px 20px 20px;}
+.pomo-play-btn{display:flex;align-items:center;gap:7px;padding:10px 26px;border-radius:40px;border:2px solid;font-family:var(--mono);font-size:.7rem;font-weight:700;letter-spacing:4px;text-transform:uppercase;cursor:pointer;background:transparent;transition:background .15s,transform .1s,box-shadow .15s;}
+.pomo-play-btn:active{transform:scale(.97);}
+.pomo-play-btn.start{border-color:var(--work);color:var(--work);}
+.pomo-play-btn.start:hover{background:var(--work);color:#0e0e0e;box-shadow:0 0 20px rgba(232,255,71,.3);}
+.pomo-play-btn.pause{border-color:var(--brk);color:var(--brk);}
+.pomo-play-btn.pause:hover{background:var(--brk);color:#0e0e0e;}
+.pomo-play-btn.rst{border-color:var(--border);color:var(--muted);padding:10px 16px;}
+.pomo-play-btn.rst:hover{border-color:var(--text);color:var(--text);}
+
+/* session delete */
+.sdel{background:none;border:none;cursor:pointer;color:var(--muted);font-size:.85rem;padding:2px 5px;border-radius:3px;transition:color .2s;line-height:1;display:block;margin-top:6px;}
+.sdel:hover{color:var(--stop);}
+
+/* ── Stats ── */
+.slbl{font-size:.6rem;letter-spacing:4px;text-transform:uppercase;color:var(--muted);margin-bottom:14px;}
+.bgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.bcard{background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:14px 16px;}
+.blbl{font-size:.58rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.bval{font-family:var(--disp);font-size:1.7rem;letter-spacing:1px;line-height:1;}
+.bval.cw{color:var(--work);} .bval.cn{color:var(--text);} .bval.cs{color:#ff9f47;}
+.bsub{font-size:.55rem;letter-spacing:2px;color:var(--muted);margin-top:5px;}
+.trow{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.tcard{background:var(--s2);border:1px solid var(--border);border-radius:4px;padding:14px 16px;}
+.tlbl{font-size:.58rem;letter-spacing:3px;text-transform:uppercase;color:var(--muted);margin-bottom:6px;}
+.tval{font-family:var(--disp);font-size:1.4rem;letter-spacing:1px;line-height:1;}
+.ccrd{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:20px 20px 16px;}
+.chdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.ctit{font-family:var(--disp);font-size:1.1rem;letter-spacing:3px;color:var(--muted);}
+.cleg{display:flex;gap:12px;}
+.lgi{display:flex;align-items:center;gap:5px;font-size:.58rem;letter-spacing:2px;color:var(--muted);text-transform:uppercase;}
+.lgd{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.cempty{text-align:center;padding:32px 0;font-size:.62rem;letter-spacing:3px;color:var(--muted);text-transform:uppercase;}
+.cwrap{position:relative;width:100%;}
+.avglbl{font-size:.58rem;letter-spacing:2px;color:rgba(255,255,255,.25);text-transform:uppercase;margin-top:8px;text-align:right;}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <h1>RATIO TIMER</h1>
+  <div class="sub">Work · Break · Balance</div>
+</div>
+
+<!-- Settings gear -->
+<button class="settings-btn" id="settingsBtn" onclick="toggleSettings(event)" title="Settings">⚙</button>
+<div class="settings-panel" id="settingsPanel">
+  <div class="settings-title">App Settings</div>
+  <div class="settings-row">
+    <span class="settings-lbl">Theme</span>
+    <div class="theme-toggle">
+      <div class="theme-opt on" id="theme-dark" onclick="setTheme('dark')">Dark</div>
+      <div class="theme-opt" id="theme-light" onclick="setTheme('light')">Light</div>
+    </div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" id="t-timer" onclick="switchTab('timer')">⏱ Timer</button>
+  <button class="tab" id="t-stats" onclick="switchTab('stats')">📊 Productivity</button>
+</div>
+
+<!-- ══════ TIMER TAB ══════ -->
+<div class="panel on" id="p-timer">
+
+  <!-- Ratio timer card -->
+  <div class="card">
+    <div class="status-row">
+      <div class="sbadge" id="sbadge"><div class="sdot"></div><span id="stext">IDLE</span></div>
+      <div style="display:flex;align-items:center">
+        <div class="rbadge" id="rbadge"><span class="rw">–</span> : <span class="rb">–</span></div>
+        <span class="fpill" id="fpill">–%</span>
+      </div>
+    </div>
+    <div class="timers">
+      <div class="tblock" id="wb"><div class="lbl">Work</div><div class="tim" id="wdisp">00:00:00</div></div>
+      <div class="tblock" id="bb"><div class="lbl">Break</div><div class="tim" id="bdisp">00:00:00</div></div>
+    </div>
+    <div class="bar-sec">
+      <div class="bar-lr"><span>Work</span><span>Break</span></div>
+      <div class="btrack">
+        <div class="bw" id="bw" style="width:50%"><span class="bp" id="wpct"></span></div>
+        <div class="bb" id="bbb" style="width:50%"><span class="bp" id="bpct"></span></div>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn bw-btn" id="wbtn" onclick="doWork()">▶ WORK</button>
+      <button class="btn bb-btn" id="bbtn" onclick="doBreak()" disabled>⏸ BREAK</button>
+    </div>
+    <div class="btns3">
+      <button class="btn bs-btn" id="stbtn" onclick="doStop()" disabled>■ STOP</button>
+      <button class="btn br-btn" id="resbtn" onclick="doResume()" disabled>⟳ RESUME</button>
+      <button class="btn brs-btn" onclick="doReset()">↺ RESET</button>
+    </div>
+    <div class="rhint" id="rhint">Accidentally stopped? Hit resume!</div>
+  </div>
+
+  <!-- Pomodoro card — above sessions -->
+  <div class="pcard" id="pcard">
+    <div class="pbar">
+      <div class="ptoggle-wrap">
+        <span class="ptog-lbl">Pomodoro</span>
+        <label class="ptog">
+          <input type="checkbox" id="ptog" onchange="togglePomo(this.checked)">
+          <span class="ptog-sl"></span>
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;margin-left:auto">
+        <button class="pdots-btn" id="pskipbtn" onclick="skipPhase()" style="display:none" title="Skip to next phase">⏭</button>
+        <button class="pdots-btn" id="pdotsbtn" onclick="toggleMenu(event)" style="display:none">⋮</button>
+      </div>
+    </div>
+
+    <!-- Inline accordion settings menu -->
+    <div class="pmenu" id="pmenu">
+      <div class="pmenu-section">
+        <div class="pmenu-row" onclick="toggleAccordion('work')">
+          <span>Work Duration</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="cur-val" id="cv-work">25 min</span>
+            <span class="pmenu-arrow" id="arr-work">›</span>
+          </div>
+        </div>
+        <div class="pmenu-opts" id="opts-work">
+          <div class="pmenu-opt" onclick="setDur('work',15)"><span>15 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('work',20)"><span>20 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt chosen" onclick="setDur('work',25)"><span>25 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('work',30)"><span>30 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('work',45)"><span>45 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('work',50)"><span>50 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('work',60)"><span>60 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('work',90)"><span>90 minutes</span><span class="chk">✓</span></div>
+        </div>
+      </div>
+      <div class="pmenu-section">
+        <div class="pmenu-row" onclick="toggleAccordion('brk')">
+          <span>Break Duration</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="cur-val" id="cv-brk">5 min</span>
+            <span class="pmenu-arrow" id="arr-brk">›</span>
+          </div>
+        </div>
+        <div class="pmenu-opts" id="opts-brk">
+          <div class="pmenu-opt" onclick="setDur('brk',3)"><span>3 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt chosen" onclick="setDur('brk',5)"><span>5 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('brk',10)"><span>10 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('brk',15)"><span>15 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('brk',20)"><span>20 minutes</span><span class="chk">✓</span></div>
+        </div>
+      </div>
+      <div class="pmenu-section">
+        <div class="pmenu-row" onclick="toggleAccordion('lbrk')">
+          <span>Long Break</span>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="cur-val" id="cv-lbrk">15 min</span>
+            <span class="pmenu-arrow" id="arr-lbrk">›</span>
+          </div>
+        </div>
+        <div class="pmenu-opts" id="opts-lbrk">
+          <div class="pmenu-opt" onclick="setDur('lbrk',10)"><span>10 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt chosen" onclick="setDur('lbrk',15)"><span>15 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('lbrk',20)"><span>20 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('lbrk',25)"><span>25 minutes</span><span class="chk">✓</span></div>
+          <div class="pmenu-opt" onclick="setDur('lbrk',30)"><span>30 minutes</span><span class="chk">✓</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Disabled state -->
+    <div class="pdisabled-overlay" id="pdisabled">Toggle on to enable Pomodoro mode</div>
+
+    <!-- Active display -->
+    <div id="pactive" style="display:none">
+      <div class="pcountdown">
+        <div class="pphase-lbl work" id="pphlbl">WORK</div>
+        <div class="ptime work" id="ptimedisp">25:00</div>
+      </div>
+      <div class="pdots" id="pdotrow"></div>
+      <div class="pomo-play-row">
+        <button class="pomo-play-btn start" id="pomoPlayBtn" onclick="togglePomoRunning()">▶ START</button>
+        <button class="pomo-play-btn rst" onclick="resetPomo()">↺ RESET</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Session history -->
+  <div class="card">
+    <div class="hhdr">
+      <h2>SESSIONS</h2>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="hcnt" id="hcnt">0 sessions</span>
+        <button class="clr-btn" onclick="clearHistory()">clear all</button>
+      </div>
+    </div>
+    <div class="slist" id="slist"><div class="empty">No sessions yet — start working!</div></div>
+  </div>
+
+</div><!-- /timer panel -->
+
+<!-- ══════ STATS TAB ══════ -->
+<div class="panel" id="p-stats">
+
+  <div class="card">
+    <div class="slbl">Personal Bests</div>
+    <div class="bgrid">
+      <div class="bcard"><div class="blbl">Longest Session</div><div class="bval cw" id="bsess">–</div><div class="bsub" id="bsessdt">no data yet</div></div>
+      <div class="bcard"><div class="blbl">Best Focus Score</div><div class="bval cn" id="bfoc">–</div><div class="bsub" id="bfocdt">work % of session</div></div>
+      <div class="bcard"><div class="blbl">Current Streak</div><div class="bval cs" id="bstreak">0 days</div><div class="bsub">consecutive active days</div></div>
+      <div class="bcard"><div class="blbl">Total Sessions</div><div class="bval cn" id="bsessn">0</div><div class="bsub">all time</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="slbl">All-Time Totals</div>
+    <div class="trow">
+      <div class="tcard"><div class="tlbl">Total Work</div><div class="tval cw" id="twrk">00:00:00</div></div>
+      <div class="tcard"><div class="tlbl">Total Break</div><div class="tval" style="color:var(--brk)" id="tbrk">00:00:00</div></div>
+    </div>
+  </div>
+
+  <div class="ccrd">
+    <div class="chdr"><span class="ctit">SESSIONS</span>
+      <div class="cleg">
+        <div class="lgi"><div class="lgd" style="background:var(--work)"></div>Work</div>
+        <div class="lgi"><div class="lgd" style="background:var(--brk)"></div>Break</div>
+      </div>
+    </div>
+    <div class="cempty" id="bar-empty">Complete sessions to see your history</div>
+    <div class="cwrap" id="bar-wrap" style="display:none"><canvas id="barChart"></canvas></div>
+  </div>
+
+  <div class="ccrd">
+    <div class="chdr"><span class="ctit">FOCUS SCORE</span>
+      <div class="cleg">
+        <div class="lgi"><div class="lgd" style="background:var(--work);border-radius:50%"></div>Work %</div>
+        <div class="lgi"><div class="lgd" style="background:rgba(255,255,255,.2)"></div>Avg</div>
+      </div>
+    </div>
+    <div class="cempty" id="foc-empty">Complete sessions to see your focus trend</div>
+    <div class="cwrap" id="foc-wrap" style="display:none"><canvas id="focChart"></canvas></div>
+    <div class="avglbl" id="avglbl" style="display:none"></div>
+  </div>
+
+</div><!-- /stats panel -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ═══════════════════════════════════════════════
+   BACKGROUND-SAFE TIMING
+   Uses Date.now() deltas so the timer stays
+   accurate when the tab is hidden, the system
+   sleeps, or the lid is closed.
+═══════════════════════════════════════════════ */
+let lastTickAt = null;   // timestamp of last tick
+let tickTimer  = null;   // setInterval handle
+
+function startTicking() {
+  if (tickTimer) return;
+  lastTickAt = Date.now();
+  tickTimer = setInterval(tickFrame, 500); // poll at 500ms, fire by elapsed seconds
+}
+function stopTicking() {
+  clearInterval(tickTimer);
+  tickTimer = null;
+  lastTickAt = null;
+}
+
+// Called at ~500ms. Calculates how many whole seconds elapsed and runs that many ticks.
+function tickFrame() {
+  if (!lastTickAt) return;
+  const now = Date.now();
+  const elapsed = Math.floor((now - lastTickAt) / 1000);
+  if (elapsed < 1) return;
+  lastTickAt += elapsed * 1000;
+  for (let i = 0; i < elapsed; i++) tick();
+}
+
+// When page becomes visible again after being hidden, catch up immediately.
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && tickTimer && lastTickAt) {
+    tickFrame();
+  }
+});
+
+/* ═══════════════════════════════════════════════
+   RATIO TIMER STATE
+═══════════════════════════════════════════════ */
+let rtState = 'idle'; // idle | working | breaking | stopped
+let wSecs = 0, bSecs = 0;
+let sessions = JSON.parse(localStorage.getItem('rtsessions') || '[]');
+let prevState = 'working'; // for resume
+
+function tick() {
+  if (rtState === 'working')  wSecs++;
+  if (rtState === 'breaking') bSecs++;
+  pomoTick();
+  renderTimerUI();
+}
+
+/* ── Ratio timer helpers ── */
+function fmt(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc = s%60;
+  return `${ph(h)}:${ph(m)}:${ph(sc)}`;
+}
+function ph(n) { return String(n).padStart(2,'0'); }
+function fmtShort(s) { const h=Math.floor(s/3600),m=Math.floor((s%3600)/60); return h?`${h}h ${m}m`:`${m}m`; }
+function mmss(s) { return `${ph(Math.floor(s/60))}:${ph(s%60)}`; }
+function gcd(a,b) { return b?gcd(b,a%b):a; }
+function ratio(w,b) { if(!w&&!b)return['–','–']; if(!w)return['0','1']; if(!b)return['1','0']; const g=gcd(w,b); return[Math.round(w/g),Math.round(b/g)]; }
+function focusPct(w,b) { const t=w+b; return t?Math.round(w/t*100):0; }
+
+function setStatus(s) {
+  const el=document.getElementById('sbadge'), tx=document.getElementById('stext');
+  el.className='sbadge';
+  if(s==='working'){el.classList.add('wrk');tx.textContent='WORKING';}
+  else if(s==='breaking'){el.classList.add('brk');tx.textContent='ON BREAK';}
+  else if(s==='stopped'){tx.textContent='STOPPED';}
+  else{tx.textContent='IDLE';}
+}
+
+function renderTimerUI() {
+  document.getElementById('wdisp').textContent = fmt(wSecs);
+  document.getElementById('bdisp').textContent = fmt(bSecs);
+  const total = wSecs + bSecs;
+  const wp = total ? wSecs/total*100 : 50, bp = 100-wp;
+  const bwEl=document.getElementById('bw'), bbEl=document.getElementById('bbb');
+  bwEl.style.width=wp+'%'; bbEl.style.width=bp+'%';
+  if (total) {
+    bwEl.classList.add('has'); bbEl.classList.add('has');
+    document.getElementById('wpct').textContent=Math.round(wp)+'%';
+    document.getElementById('bpct').textContent=Math.round(bp)+'%';
+  } else { bwEl.classList.remove('has'); bbEl.classList.remove('has'); }
+  const [rw,rb]=ratio(wSecs,bSecs);
+  document.getElementById('rbadge').innerHTML=`<span class="rw">${rw}</span> : <span class="rb">${rb}</span>`;
+  const pill=document.getElementById('fpill');
+  if (total) { pill.textContent=focusPct(wSecs,bSecs)+'%'; pill.classList.add('on'); }
+  else { pill.textContent='–%'; pill.classList.remove('on'); }
+}
+
+/* ── Button actions ── */
+function doWork() {
+  if (rtState==='idle'||rtState==='breaking') {
+    rtState='working'; startTicking(); setStatus('working');
+    document.getElementById('wb').className='tblock aw';
+    document.getElementById('bb').className='tblock';
+    document.getElementById('wbtn').classList.add('on');
+    document.getElementById('bbtn').classList.remove('on');
+    document.getElementById('bbtn').disabled=false;
+    document.getElementById('stbtn').disabled=false;
+    document.getElementById('resbtn').disabled=true;
+    document.getElementById('rhint').classList.remove('on');
+  }
+}
+function doBreak() {
+  if (rtState==='working') {
+    rtState='breaking'; setStatus('breaking');
+    document.getElementById('bb').className='tblock ab';
+    document.getElementById('wb').className='tblock';
+    document.getElementById('bbtn').classList.add('on');
+    document.getElementById('wbtn').classList.remove('on');
+  }
+}
+function doStop() {
+  if (rtState==='idle'||rtState==='stopped') return;
+  prevState = rtState;
+  rtState='stopped'; stopTicking(); setStatus('stopped');
+  document.getElementById('wb').className='tblock';
+  document.getElementById('bb').className='tblock';
+  document.getElementById('wbtn').classList.remove('on');
+  document.getElementById('bbtn').classList.remove('on');
+  document.getElementById('wbtn').disabled=true;
+  document.getElementById('bbtn').disabled=true;
+  document.getElementById('stbtn').disabled=true;
+  document.getElementById('resbtn').disabled=false;
+  document.getElementById('rhint').classList.add('on');
+  saveSession();
+}
+function doResume() {
+  if (sessions.length) {
+    sessions.shift();
+    localStorage.setItem('rtsessions',JSON.stringify(sessions));
+    renderHistory();
+  }
+  document.getElementById('resbtn').disabled=true;
+  document.getElementById('rhint').classList.remove('on');
+  document.getElementById('wbtn').disabled=false;
+  document.getElementById('bbtn').disabled=false;
+  if (prevState==='breaking') { rtState='working'; doBreak(); }
+  else { rtState='breaking'; doWork(); }
+  document.getElementById('stbtn').disabled=false;
+}
+function doReset() {
+  stopTicking(); rtState='idle'; wSecs=0; bSecs=0;
+  setStatus('idle'); renderTimerUI();
+  document.getElementById('wb').className='tblock';
+  document.getElementById('bb').className='tblock';
+  document.getElementById('wbtn').classList.remove('on');
+  document.getElementById('bbtn').classList.remove('on');
+  document.getElementById('wbtn').disabled=false;
+  document.getElementById('bbtn').disabled=true;
+  document.getElementById('stbtn').disabled=true;
+  document.getElementById('resbtn').disabled=true;
+  document.getElementById('rhint').classList.remove('on');
+  if (pomoOn) resetPomo();
+}
+
+/* ── Sessions ── */
+function saveSession() {
+  if (!wSecs && !bSecs) return;
+  const now=new Date();
+  sessions.unshift({
+    date:now.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+    dateISO:now.toISOString().slice(0,10),
+    time:now.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),
+    work:wSecs, break:bSecs
+  });
+  localStorage.setItem('rtsessions',JSON.stringify(sessions));
+  renderHistory();
+}
+function clearHistory() {
+  if (!confirm('Delete all session history?\n\nThis cannot be undone — all data will be permanently lost.')) return;
+  sessions=[];
+  localStorage.removeItem('rtsessions');
+  renderHistory();
+  if (barCI){barCI.destroy();barCI=null;}
+  if (focCI){focCI.destroy();focCI=null;}
+  if (document.getElementById('p-stats').classList.contains('on')) renderStats();
+}
+function deleteSession(idx) {
+  sessions.splice(idx, 1);
+  localStorage.setItem('rtsessions', JSON.stringify(sessions));
+  renderHistory();
+  if (document.getElementById('p-stats').classList.contains('on')) renderStats();
+}
+function renderHistory() {
+  const list=document.getElementById('slist'), cnt=document.getElementById('hcnt');
+  cnt.textContent=sessions.length+(sessions.length===1?' session':' sessions');
+  if (!sessions.length){list.innerHTML='<div class="empty">No sessions yet — start working!</div>';return;}
+  list.innerHTML=sessions.map((s,i)=>{
+    const tot=s.work+s.break, wp=tot?s.work/tot*100:50, fp=focusPct(s.work,s.break);
+    const [rw,rb]=ratio(s.work,s.break);
+    return`<div class="sitem">
+      <div>
+        <div class="sdate">${s.date} · ${s.time}</div>
+        <div class="stimes"><span class="sw">▶ ${fmt(s.work)}</span><span class="sbk">⏸ ${fmt(s.break)}</span></div>
+        <div class="smbar"><div class="smw" style="width:${wp}%"></div><div class="smb" style="width:${100-wp}%"></div></div>
+      </div>
+      <div style="text-align:right">
+        <div class="srat">${rw}:${rb}</div>
+        <div class="sfoc">${fp}%</div>
+        <button class="sdel" onclick="deleteSession(${i})" title="Delete session">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   POMODORO — fully independent timer
+   Has its own running state, not tied to ratio timer.
+═══════════════════════════════════════════════ */
+let pomoOn      = false;
+let pomoRunning = false;
+let pomoPhase   = 'work';   // 'work' | 'brk' | 'lbrk'
+let pomoLeft    = 0;
+let pomoRound   = 0;        // completed work rounds (0–3)
+const ROUNDS_BEFORE_LBRK = 4;
+let pomoDur = { work:25, brk:5, lbrk:15 };
+
+function togglePomo(on) {
+  pomoOn = on;
+  document.getElementById('pdotsbtn').style.display = on ? '' : 'none';
+  document.getElementById('pskipbtn').style.display = on ? '' : 'none';
+  document.getElementById('pdisabled').style.display = on ? 'none' : '';
+  document.getElementById('pactive').style.display = on ? 'block' : 'none';
+  if (on) { resetPomo(); }
+  else { pomoRunning = false; }
+}
+
+function togglePomoRunning() {
+  if (!pomoOn) return;
+  pomoRunning = !pomoRunning;
+  const btn = document.getElementById('pomoPlayBtn');
+  if (pomoRunning) {
+    btn.textContent = '⏸ PAUSE';
+    btn.className = 'pomo-play-btn pause';
+  } else {
+    btn.textContent = '▶ START';
+    btn.className = 'pomo-play-btn start';
+  }
+}
+
+function resetPomo() {
+  pomoRunning = false;
+  pomoPhase = 'work';
+  pomoRound = 0;
+  pomoLeft  = pomoDur.work * 60;
+  const btn = document.getElementById('pomoPlayBtn');
+  if (btn) { btn.textContent = '▶ START'; btn.className = 'pomo-play-btn start'; }
+  renderPomoUI();
+}
+
+function skipPhase() {
+  if (!pomoOn) return;
+  // Pause while we advance
+  pomoRunning = false;
+  const btn = document.getElementById('pomoPlayBtn');
+  if (btn) { btn.textContent = '▶ START'; btn.className = 'pomo-play-btn start'; }
+
+  if (pomoPhase === 'work') {
+    pomoRound++;
+    if (pomoRound >= ROUNDS_BEFORE_LBRK) {
+      pomoPhase = 'lbrk';
+      pomoLeft  = pomoDur.lbrk * 60;
+      pomoRound = 0;
+    } else {
+      pomoPhase = 'brk';
+      pomoLeft  = pomoDur.brk * 60;
+    }
+  } else {
+    // skip break or long break → back to work
+    pomoPhase = 'work';
+    pomoLeft  = pomoDur.work * 60;
+  }
+  renderPomoUI();
+}
+
+function pomoTick() {
+  if (!pomoOn || !pomoRunning) return;
+  pomoLeft--;
+  if (pomoLeft <= 0) {
+    if (pomoPhase === 'work') {
+      pomoRound++;
+      if (pomoRound >= ROUNDS_BEFORE_LBRK) {
+        pomoPhase = 'lbrk';
+        pomoLeft  = pomoDur.lbrk * 60;
+        pomoRound = 0;
+        notify('🎉 Long break time!', `You crushed ${ROUNDS_BEFORE_LBRK} rounds — take a ${pomoDur.lbrk} min long break!`);
+      } else {
+        pomoPhase = 'brk';
+        pomoLeft  = pomoDur.brk * 60;
+        notify('☕ Break time!', `Nice work! Take a ${pomoDur.brk} min break.`);
+      }
+    } else {
+      // break or long break ended
+      const nextRound = pomoRound + 1;
+      pomoPhase = 'work';
+      pomoLeft  = pomoDur.work * 60;
+      notify('💪 Back to work!', `Break over — starting round ${nextRound}!`);
+    }
+  }
+  renderPomoUI();
+}
+
+function renderPomoUI() {
+  if (!pomoOn) return;
+  const labels = { work:'WORK', brk:'BREAK', lbrk:'LONG BREAK' };
+  const cls    = { work:'work', brk:'brk',   lbrk:'lbrk' };
+  document.getElementById('pcard').className = `pcard phase-${pomoPhase==='lbrk'?'longbreak':pomoPhase}`;
+  const lbl = document.getElementById('pphlbl'), tim = document.getElementById('ptimedisp');
+  lbl.className = `pphase-lbl ${cls[pomoPhase]}`;
+  lbl.textContent = labels[pomoPhase];
+  tim.className   = `ptime ${cls[pomoPhase]}`;
+  tim.textContent = mmss(pomoLeft);
+  renderDots();
+  updateSubChecks();
+}
+
+function renderDots() {
+  const row = document.getElementById('pdotrow');
+  row.innerHTML = '';
+  for (let i=0; i<ROUNDS_BEFORE_LBRK; i++) {
+    const d = document.createElement('div');
+    d.className = 'pdot';
+    if (i < pomoRound) d.classList.add('done');
+    else if (i === pomoRound && pomoPhase === 'work') d.classList.add('active');
+    row.appendChild(d);
+  }
+}
+
+/* ── Pomodoro settings accordion ── */
+function toggleMenu(e) {
+  e.stopPropagation();
+  document.getElementById('pmenu').classList.toggle('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#pmenu') && !e.target.closest('#pdotsbtn')) {
+    document.getElementById('pmenu').classList.remove('open');
+  }
+  if (!e.target.closest('#settingsPanel') && !e.target.closest('#settingsBtn')) {
+    document.getElementById('settingsPanel').classList.remove('open');
+  }
+});
+
+function toggleAccordion(key) {
+  const opts = document.getElementById('opts-' + key);
+  const arr  = document.getElementById('arr-' + key);
+  const row  = opts.previousElementSibling;
+  const isOpen = opts.classList.contains('open');
+  // Close all first
+  ['work','brk','lbrk'].forEach(k => {
+    document.getElementById('opts-'+k).classList.remove('open');
+    document.getElementById('arr-'+k).style.transform = '';
+    document.getElementById('opts-'+k).previousElementSibling.classList.remove('open');
+  });
+  if (!isOpen) {
+    opts.classList.add('open');
+    arr.style.transform = 'rotate(90deg)';
+    row.classList.add('open');
+  }
+}
+
+function setDur(key, mins) {
+  pomoDur[key] = mins;
+  if (key === 'work' && pomoPhase === 'work') pomoLeft = mins * 60;
+  if (key === 'brk'  && pomoPhase === 'brk')  pomoLeft = mins * 60;
+  if (key === 'lbrk' && pomoPhase === 'lbrk') pomoLeft = mins * 60;
+  updateSubChecks();
+  renderPomoUI();
+}
+
+function updateSubChecks() {
+  const durMap = { work: pomoDur.work, brk: pomoDur.brk, lbrk: pomoDur.lbrk };
+  ['work','brk','lbrk'].forEach(key => {
+    const opts = document.getElementById('opts-'+key);
+    if (!opts) return;
+    opts.querySelectorAll('.pmenu-opt').forEach(el => {
+      const mins = parseInt(el.querySelector('span').textContent);
+      el.classList.toggle('chosen', mins === durMap[key]);
+    });
+    document.getElementById('cv-'+key).textContent = durMap[key] + ' min';
+  });
+}
+
+/* ── App settings + theme ── */
+function toggleSettings(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('settingsPanel');
+  const btn   = document.getElementById('settingsBtn');
+  panel.classList.toggle('open');
+  btn.classList.toggle('spinning');
+  setTimeout(() => btn.classList.remove('spinning'), 300);
+}
+
+function setTheme(mode) {
+  document.body.classList.toggle('light', mode === 'light');
+  document.getElementById('theme-dark').classList.toggle('on', mode === 'dark');
+  document.getElementById('theme-light').classList.toggle('on', mode === 'light');
+  localStorage.setItem('rtTheme', mode);
+}
+
+// Restore saved theme on load
+const savedTheme = localStorage.getItem('rtTheme');
+if (savedTheme === 'light') setTheme('light');
+
+/* ── Notifications ── */
+function notify(title, body) {
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body });
+  }
+  // Tab title flash fallback
+  let n=0; const orig=document.title;
+  const iv=setInterval(()=>{ document.title=n++%2?'Ratio Timer':title; if(n>7){clearInterval(iv);document.title=orig;} },700);
+}
+// Request notification permission silently on load
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission();
+}
+
+/* ═══════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════ */
+function switchTab(t) {
+  ['timer','stats'].forEach(id => {
+    document.getElementById('p-'+id).classList.toggle('on',id===t);
+    document.getElementById('t-'+id).classList.toggle('on',id===t);
+  });
+  if (t==='stats') renderStats();
+}
+
+/* ═══════════════════════════════════════════════
+   STATS
+═══════════════════════════════════════════════ */
+let barCI=null, focCI=null;
+
+function calcStreak() {
+  if (!sessions.length) return 0;
+  const days=[...new Set(sessions.map(s=>s.dateISO||s.date))].sort().reverse();
+  const today=new Date().toISOString().slice(0,10);
+  const yest=new Date(Date.now()-86400000).toISOString().slice(0,10);
+  if (days[0]!==today&&days[0]!==yest) return 0;
+  let str=1;
+  for (let i=1;i<days.length;i++){
+    if((new Date(days[i-1])-new Date(days[i]))/86400000===1) str++; else break;
+  }
+  return str;
+}
+
+function renderStats() {
+  if (!sessions.length) {
+    document.getElementById('bsess').textContent='–';
+    document.getElementById('bsessdt').textContent='no data yet';
+    document.getElementById('bfoc').textContent='–';
+    document.getElementById('bfocdt').textContent='work % of session';
+    document.getElementById('bstreak').textContent='0 days';
+    document.getElementById('bsessn').textContent='0';
+    document.getElementById('twrk').textContent='00:00:00';
+    document.getElementById('tbrk').textContent='00:00:00';
+    hideCharts(); return;
+  }
+  const longest=sessions.reduce((b,s)=>s.work+s.break>b.work+b.break?s:b,sessions[0]);
+  document.getElementById('bsess').textContent=fmtShort(longest.work+longest.break);
+  document.getElementById('bsessdt').textContent=longest.date;
+  const bestF=sessions.reduce((b,s)=>focusPct(s.work,s.break)>focusPct(b.work,b.break)?s:b,sessions[0]);
+  document.getElementById('bfoc').textContent=focusPct(bestF.work,bestF.break)+'%';
+  document.getElementById('bfocdt').textContent=bestF.date;
+  document.getElementById('bstreak').textContent=calcStreak()+' days';
+  document.getElementById('bsessn').textContent=sessions.length;
+  document.getElementById('twrk').textContent=fmt(sessions.reduce((s,x)=>s+x.work,0));
+  document.getElementById('tbrk').textContent=fmt(sessions.reduce((s,x)=>s+x.break,0));
+  renderBarChart(); renderFocChart();
+}
+function hideCharts(){
+  ['bar-empty','foc-empty'].forEach(id=>{document.getElementById(id).style.display='';});
+  ['bar-wrap','foc-wrap'].forEach(id=>{document.getElementById(id).style.display='none';});
+  document.getElementById('avglbl').style.display='none';
+}
+function clbl(arr){return arr.map(s=>{const p=(s.date||'').split(' ');return p.length>=2?p[0]+' '+p[1].replace(',',''):s.date||'';});}
+
+function renderBarChart() {
+  const data=[...sessions].reverse().slice(-20);
+  if(!data.length){document.getElementById('bar-empty').style.display='';document.getElementById('bar-wrap').style.display='none';return;}
+  document.getElementById('bar-empty').style.display='none';
+  const wrap=document.getElementById('bar-wrap');
+  wrap.style.display='block';
+  wrap.style.height=Math.max(200,data.length*26+70)+'px';
+  if(barCI){barCI.destroy();barCI=null;}
+  barCI=new Chart(document.getElementById('barChart'),{type:'bar',data:{labels:clbl(data),datasets:[
+    {label:'Work (min)',data:data.map(s=>Math.round(s.work/60)),backgroundColor:'rgba(232,255,71,.85)',borderColor:'rgba(232,255,71,1)',borderWidth:1,borderRadius:3},
+    {label:'Break (min)',data:data.map(s=>Math.round(s.break/60)),backgroundColor:'rgba(71,212,255,.7)',borderColor:'rgba(71,212,255,1)',borderWidth:1,borderRadius:3}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',borderColor:'#2e2e2e',borderWidth:1,titleColor:'#f0f0f0',bodyColor:'#888',titleFont:{family:"'Space Mono',monospace",size:11},bodyFont:{family:"'Space Mono',monospace",size:11},callbacks:{label:ctx=>` ${ctx.dataset.label}: ${ctx.parsed.y}m`}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#555',font:{family:"'Space Mono',monospace",size:9},maxRotation:45,autoSkip:false},border:{color:'#2e2e2e'}},y:{grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#555',font:{family:"'Space Mono',monospace",size:9},callback:v=>v+'m'},border:{color:'#2e2e2e'}}}}});
+}
+function renderFocChart() {
+  const data=[...sessions].reverse().slice(-20);
+  if(!data.length){document.getElementById('foc-empty').style.display='';document.getElementById('foc-wrap').style.display='none';document.getElementById('avglbl').style.display='none';return;}
+  document.getElementById('foc-empty').style.display='none';
+  const wrap=document.getElementById('foc-wrap');
+  wrap.style.display='block'; wrap.style.height='210px';
+  const scores=data.map(s=>focusPct(s.work,s.break));
+  const avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+  document.getElementById('avglbl').style.display='block';
+  document.getElementById('avglbl').textContent='avg '+avg+'% across '+data.length+' sessions';
+  if(focCI){focCI.destroy();focCI=null;}
+  focCI=new Chart(document.getElementById('focChart'),{type:'line',data:{labels:clbl(data),datasets:[
+    {label:'Focus %',data:scores,borderColor:'#e8ff47',backgroundColor:'rgba(232,255,71,.07)',pointBackgroundColor:'#e8ff47',pointBorderColor:'#0e0e0e',pointBorderWidth:2,pointRadius:5,pointHoverRadius:7,borderWidth:2,fill:true,tension:.35},
+    {label:'Average',data:scores.map(()=>avg),borderColor:'rgba(255,255,255,.18)',borderWidth:1,borderDash:[5,5],pointRadius:0,fill:false,tension:0}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#1a1a1a',borderColor:'#2e2e2e',borderWidth:1,titleColor:'#f0f0f0',bodyColor:'#888',titleFont:{family:"'Space Mono',monospace",size:11},bodyFont:{family:"'Space Mono',monospace",size:11},filter:i=>i.datasetIndex===0,callbacks:{label:ctx=>` Focus: ${ctx.parsed.y}%`}}},scales:{x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#555',font:{family:"'Space Mono',monospace",size:9},maxRotation:45},border:{color:'#2e2e2e'}},y:{min:0,max:100,grid:{color:'rgba(255,255,255,.05)'},ticks:{color:'#555',font:{family:"'Space Mono',monospace",size:9},callback:v=>v+'%',stepSize:25},border:{color:'#2e2e2e'}}}}});
+}
+
+/* ── Init ── */
+renderTimerUI();
+renderHistory();
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
