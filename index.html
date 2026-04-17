@@ -612,12 +612,18 @@ body {
 <div class="auth-panel" id="authPanel">
   <!-- Guest state -->
   <div id="authGuest">
-    <div class="auth-lbl">Sign in to sync your data</div>
-    <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" />
-    <button class="auth-submit" id="authSubmit" onclick="sendMagicLink()">Send magic link</button>
+    <!-- Tab toggle -->
+    <div style="display:flex;background:var(--c2);border-radius:10px;padding:3px;gap:3px;margin-bottom:16px;">
+      <button id="tabSignIn" onclick="switchAuthTab('signin')" style="flex:1;padding:7px;border-radius:8px;border:none;font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer;background:var(--c1);color:var(--text);transition:background .15s,color .15s;">Sign in</button>
+      <button id="tabSignUp" onclick="switchAuthTab('signup')" style="flex:1;padding:7px;border-radius:8px;border:none;font-family:var(--font);font-size:.78rem;font-weight:500;cursor:pointer;background:transparent;color:var(--t2);transition:background .15s,color .15s;">Create account</button>
+    </div>
+    <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" autocomplete="email" />
+    <input class="auth-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" style="margin-bottom:4px;" />
+    <div id="authPasswordHint" style="font-size:.68rem;color:var(--t3);margin-bottom:10px;display:none;">Minimum 6 characters</div>
+    <button class="auth-submit" id="authSubmit" onclick="doAuth()">Sign in</button>
     <div class="auth-msg" id="authMsg"></div>
     <div class="auth-divider"></div>
-    <div class="auth-msg">Your sessions save automatically across every device once signed in</div>
+    <div class="auth-msg">Sessions sync across every device once signed in</div>
   </div>
   <!-- Signed in state -->
   <div id="authUser" style="display:none">
@@ -1496,12 +1502,9 @@ const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 let currentUser = null;
 
 async function initAuth() {
-  // Handle magic link redirect (token in URL hash)
-  const hash = window.location.hash;
-  if (hash && hash.includes('access_token')) {
-    // Supabase picks this up automatically via getSession
-    window.history.replaceState(null, '', window.location.pathname);
-  }
+  // Enter key on password field triggers auth
+  document.getElementById('authPassword').addEventListener('keydown', e => { if(e.key==='Enter') doAuth(); });
+  document.getElementById('authEmail').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('authPassword').focus(); });
   const { data: { session } } = await sb.auth.getSession();
   if (session) { currentUser = session.user; await onSignIn(session.user); }
   sb.auth.onAuthStateChange(async (event, session) => {
@@ -1571,28 +1574,60 @@ function updateAuthUI(user) {
   }
 }
 
-async function sendMagicLink() {
-  const email = document.getElementById('authEmail').value.trim();
-  if (!email) return;
+async function sendMagicLink() { /* replaced by doAuth */ }
+
+let authMode = 'signin';
+function switchAuthTab(mode) {
+  authMode = mode;
+  const isSignUp = mode === 'signup';
+  const si = document.getElementById('tabSignIn');
+  const su = document.getElementById('tabSignUp');
+  si.style.background = isSignUp ? 'transparent' : 'var(--c1)';
+  si.style.color = isSignUp ? 'var(--t2)' : 'var(--text)';
+  si.style.fontWeight = isSignUp ? '500' : '600';
+  su.style.background = isSignUp ? 'var(--c1)' : 'transparent';
+  su.style.color = isSignUp ? 'var(--text)' : 'var(--t2)';
+  su.style.fontWeight = isSignUp ? '600' : '500';
+  document.getElementById('authSubmit').textContent = isSignUp ? 'Create account' : 'Sign in';
+  document.getElementById('authPassword').placeholder = isSignUp ? 'Choose a password' : 'Password';
+  document.getElementById('authPassword').autocomplete = isSignUp ? 'new-password' : 'current-password';
+  document.getElementById('authPasswordHint').style.display = isSignUp ? 'block' : 'none';
+  document.getElementById('authMsg').textContent = '';
+  document.getElementById('authMsg').className = 'auth-msg';
+}
+
+async function doAuth() {
+  const email    = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
   const btn = document.getElementById('authSubmit');
   const msg = document.getElementById('authMsg');
+  if (!email || !password) { msg.className='auth-msg error'; msg.textContent='Please enter your email and password.'; return; }
+  if (authMode === 'signup' && password.length < 6) { msg.className='auth-msg error'; msg.textContent='Password must be at least 6 characters.'; return; }
   btn.disabled = true;
-  btn.textContent = 'Sending…';
-  msg.className = 'auth-msg';
-  msg.textContent = '';
-  const { error } = await sb.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: 'https://worktime.wingrove.org' }
-  });
+  btn.textContent = authMode === 'signup' ? 'Creating account…' : 'Signing in…';
+  msg.textContent = ''; msg.className = 'auth-msg';
+  let error;
+  if (authMode === 'signup') {
+    const res = await sb.auth.signUp({ email, password });
+    error = res.error;
+    if (!error) {
+      msg.className = 'auth-msg success';
+      msg.textContent = '✓ Account created! Check your email to confirm, then sign in.';
+      btn.textContent = 'Create account';
+      btn.disabled = false;
+      switchAuthTab('signin');
+      return;
+    }
+  } else {
+    const res = await sb.auth.signInWithPassword({ email, password });
+    error = res.error;
+  }
   if (error) {
     msg.className = 'auth-msg error';
-    msg.textContent = error.message;
+    msg.textContent = error.message === 'Invalid login credentials'
+      ? 'Incorrect email or password.' : error.message;
     btn.disabled = false;
-    btn.textContent = 'Send magic link';
-  } else {
-    msg.className = 'auth-msg success';
-    msg.textContent = '✓ Check your email — click the link to sign in!';
-    btn.textContent = 'Sent!';
+    btn.textContent = authMode === 'signup' ? 'Create account' : 'Sign in';
   }
 }
 
