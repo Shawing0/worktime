@@ -1140,7 +1140,10 @@ async function saveSession() {
       user_id:currentUser.id, date:s.date, date_iso:s.dateISO,
       time:s.time, work:s.work, break:s.break
     });
-    if (!error) {
+    if (error) {
+      console.error('Session save failed:', error.message);
+      showToast('⚠️', 'Save failed', error.message);
+    } else {
       sessions[0].dbId = `${currentUser.id}_${s.dateISO}_${s.time}`;
       localStorage.setItem('rtsessions',JSON.stringify(sessions));
     }
