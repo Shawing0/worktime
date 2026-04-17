@@ -1,10 +1,5 @@
-const CACHE = 'ratio-timer-v1';
-const ASSETS = [
-  '/worktime/',
-  '/worktime/index.html',
-  'https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js'
-];
+const CACHE = 'getitdone-v1';
+const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -24,6 +19,6 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    caches.match(e.request).then(cached => cached || fetch(e.request).catch(() => caches.match('/index.html')))
   );
 });
