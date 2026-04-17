@@ -530,7 +530,16 @@ body {
 }
 
 /* ── Sync indicator ── */
-.sync-dot {
+.auth-tab {
+  flex: 1; padding: 7px; border-radius: 8px; border: none;
+  font-family: var(--font); font-size: .78rem; font-weight: 500;
+  cursor: pointer; background: transparent; color: var(--t2);
+  transition: background .15s, color .15s;
+}
+.auth-tab.auth-tab-on {
+  background: var(--c1); color: var(--text); font-weight: 600;
+}
+
   width: 5px; height: 5px; border-radius: 50%;
   background: var(--brk); display: inline-block; margin-left: 5px;
   animation: syncpulse 2s ease-in-out infinite; vertical-align: middle;
@@ -612,10 +621,9 @@ body {
 <div class="auth-panel" id="authPanel">
   <!-- Guest state -->
   <div id="authGuest">
-    <!-- Tab toggle -->
     <div style="display:flex;background:var(--c2);border-radius:10px;padding:3px;gap:3px;margin-bottom:16px;">
-      <button id="tabSignIn" onclick="switchAuthTab('signin')" style="flex:1;padding:7px;border-radius:8px;border:none;font-family:var(--font);font-size:.78rem;font-weight:600;cursor:pointer;background:var(--c1);color:var(--text);transition:background .15s,color .15s;">Sign in</button>
-      <button id="tabSignUp" onclick="switchAuthTab('signup')" style="flex:1;padding:7px;border-radius:8px;border:none;font-family:var(--font);font-size:.78rem;font-weight:500;cursor:pointer;background:transparent;color:var(--t2);transition:background .15s,color .15s;">Create account</button>
+      <button id="tabSignIn" onclick="switchAuthTab('signin')" class="auth-tab auth-tab-on">Sign in</button>
+      <button id="tabSignUp" onclick="switchAuthTab('signup')" class="auth-tab">Create account</button>
     </div>
     <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" autocomplete="email" />
     <input class="auth-input" type="password" id="authPassword" placeholder="Password" autocomplete="current-password" style="margin-bottom:4px;" />
@@ -1580,14 +1588,8 @@ let authMode = 'signin';
 function switchAuthTab(mode) {
   authMode = mode;
   const isSignUp = mode === 'signup';
-  const si = document.getElementById('tabSignIn');
-  const su = document.getElementById('tabSignUp');
-  si.style.background = isSignUp ? 'transparent' : 'var(--c1)';
-  si.style.color = isSignUp ? 'var(--t2)' : 'var(--text)';
-  si.style.fontWeight = isSignUp ? '500' : '600';
-  su.style.background = isSignUp ? 'var(--c1)' : 'transparent';
-  su.style.color = isSignUp ? 'var(--text)' : 'var(--t2)';
-  su.style.fontWeight = isSignUp ? '600' : '500';
+  document.getElementById('tabSignIn').classList.toggle('auth-tab-on', !isSignUp);
+  document.getElementById('tabSignUp').classList.toggle('auth-tab-on', isSignUp);
   document.getElementById('authSubmit').textContent = isSignUp ? 'Create account' : 'Sign in';
   document.getElementById('authPassword').placeholder = isSignUp ? 'Choose a password' : 'Password';
   document.getElementById('authPassword').autocomplete = isSignUp ? 'new-password' : 'current-password';
