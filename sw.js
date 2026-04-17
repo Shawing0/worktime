@@ -1,4 +1,4 @@
-const CACHE = 'getitdone-v2';
+const CACHE = 'getitdone-v3';
 const ASSETS = ['/', '/index.html'];
 
 self.addEventListener('install', e => {
@@ -18,12 +18,17 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network first — always try to get fresh content, fall back to cache
+  // Only cache GET requests — never cache POST/PUT/DELETE (Supabase API calls)
+  if (e.request.method !== 'GET') return;
+
   e.respondWith(
     fetch(e.request)
       .then(response => {
-        const clone = response.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
+        // Only cache same-origin or static assets, not Supabase API
+        if (response.ok && !e.request.url.includes('supabase.co')) {
+          const clone = response.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(e.request).then(cached => cached || caches.match('/index.html')))

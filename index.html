@@ -1136,11 +1136,14 @@ async function saveSession() {
   localStorage.setItem('rtsessions',JSON.stringify(sessions));
   renderHistory();
   if (currentUser) {
-    const {data,error}=await sb.from('sessions').insert({
+    const {error} = await sb.from('sessions').insert({
       user_id:currentUser.id, date:s.date, date_iso:s.dateISO,
       time:s.time, work:s.work, break:s.break
-    }).select().single();
-    if (!error&&data) { sessions[0].dbId=data.id; localStorage.setItem('rtsessions',JSON.stringify(sessions)); }
+    });
+    if (!error) {
+      sessions[0].dbId = `${currentUser.id}_${s.dateISO}_${s.time}`;
+      localStorage.setItem('rtsessions',JSON.stringify(sessions));
+    }
   }
 }
 async function clearHistory() {
@@ -1155,7 +1158,13 @@ async function clearHistory() {
 }
 async function deleteSession(idx) {
   const s=sessions[idx];
-  if (currentUser&&s.dbId) await sb.from('sessions').delete().eq('id',s.dbId).eq('user_id',currentUser.id);
+  if (currentUser && s.dateISO && s.time) {
+    await sb.from('sessions')
+      .delete()
+      .eq('user_id', currentUser.id)
+      .eq('date_iso', s.dateISO)
+      .eq('time', s.time);
+  }
   sessions.splice(idx,1);
   localStorage.setItem('rtsessions',JSON.stringify(sessions));
   renderHistory();
@@ -1547,17 +1556,21 @@ async function loadFromSupabase() {
   const { data, error } = await sb
     .from('sessions')
     .select('*')
-    .eq('user_id', currentUser.id)
-    .order('id', { ascending: false });
+    .eq('user_id', currentUser.id);
   if (error) {
     console.error('Supabase load error:', error.message);
-    showToast('⚠️', 'Sync error', error.message);
     return;
   }
   if (data) {
+    data.sort((a, b) => {
+      const da = (a.date_iso||'') + ' ' + (a.time||'');
+      const db2 = (b.date_iso||'') + ' ' + (b.time||'');
+      return db2.localeCompare(da);
+    });
     sessions = data.map(r => ({
       date: r.date, dateISO: r.date_iso, time: r.time,
-      work: r.work, break: r.break, dbId: r.id
+      work: r.work, break: r.break,
+      dbId: `${r.user_id}_${r.date_iso}_${r.time}`
     }));
     localStorage.setItem('rtsessions', JSON.stringify(sessions));
     renderHistory();
