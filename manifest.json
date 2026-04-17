@@ -1,7 +1,7 @@
 {
-  "name": "Ratio Timer",
-  "short_name": "Ratio Timer",
-  "description": "Work · Break · Balance",
+  "name": "Get It Done",
+  "short_name": "Get It Done",
+  "description": "Hardcore Study Productivity",
   "start_url": "/worktime/",
   "display": "standalone",
   "background_color": "#0e0e0e",
