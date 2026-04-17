@@ -647,16 +647,6 @@ body {
   </div>
 </div>
 
-<!-- Migration banner (inside timer panel, shown after login if local data exists) -->
-<div class="migrate-banner" id="migrateBanner">
-  <div class="migrate-title">Import your existing sessions?</div>
-  <div class="migrate-desc" id="migrateDesc">We found sessions saved on this device before you signed in. Import them to your account?</div>
-  <div class="migrate-btns">
-    <button class="migrate-yes" onclick="doMigrate()">Import sessions</button>
-    <button class="migrate-no" onclick="dismissMigrate()">Skip</button>
-  </div>
-</div>
-
 <!-- Settings panel -->
 <div class="settings-panel" id="settingsPanel">
   <div class="sp-lbl">Settings</div>
@@ -1531,31 +1521,40 @@ async function initAuth() {
 
 async function onSignIn(user) {
   updateAuthUI(user);
-  // Check for local guest sessions to migrate
+  // Silently upload any guest sessions that were saved before sign-in
   const local = JSON.parse(localStorage.getItem('rtsessions') || '[]');
-  if (local.length > 0) {
-    document.getElementById('migrateDesc').textContent =
-      `We found ${local.length} session${local.length>1?'s':''} saved on this device. Import them into your account?`;
-    document.getElementById('migrateBanner').classList.add('show');
-  } else {
-    await loadFromSupabase();
+  const unsynced = local.filter(s => !s.dbId);
+  if (unsynced.length > 0) {
+    const rows = unsynced.map(s => ({
+      user_id: user.id, date: s.date,
+      date_iso: s.dateISO || s.date, time: s.time,
+      work: s.work, break: s.break
+    }));
+    await sb.from('sessions').insert(rows);
   }
+  // Always load the full account data from Supabase
+  await loadFromSupabase();
 }
 
 function onSignOut() {
   updateAuthUI(null);
-  // Fall back to localStorage
   sessions = JSON.parse(localStorage.getItem('rtsessions') || '[]');
   renderHistory();
 }
 
 async function loadFromSupabase() {
   if (!currentUser) return;
-  const { data, error } = await sb.from('sessions')
+  const { data, error } = await sb
+    .from('sessions')
     .select('*')
     .eq('user_id', currentUser.id)
     .order('created_at', { ascending: false });
-  if (!error && data) {
+  if (error) {
+    console.error('Supabase load error:', error.message);
+    showToast('⚠️', 'Sync error', error.message);
+    return;
+  }
+  if (data) {
     sessions = data.map(r => ({
       date: r.date, dateISO: r.date_iso, time: r.time,
       work: r.work, break: r.break, dbId: r.id
@@ -1638,30 +1637,11 @@ async function doAuth() {
 
 async function doSignOut() {
   await sb.auth.signOut();
+  currentUser = null;
+  sessions = JSON.parse(localStorage.getItem('rtsessions') || '[]');
+  updateAuthUI(null);
+  renderHistory();
   document.getElementById('authPanel').classList.remove('open');
-  document.getElementById('migrateBanner').classList.remove('show');
-}
-
-async function doMigrate() {
-  document.getElementById('migrateBanner').classList.remove('show');
-  const local = JSON.parse(localStorage.getItem('rtsessions') || '[]');
-  if (!local.length || !currentUser) return;
-  // Insert all local sessions into Supabase
-  const rows = local.map(s => ({
-    user_id: currentUser.id, date: s.date,
-    date_iso: s.dateISO || s.date, time: s.time,
-    work: s.work, break: s.break
-  }));
-  const { error } = await sb.from('sessions').insert(rows);
-  if (!error) {
-    showToast('✓', 'Sessions imported!', `${local.length} sessions saved to your account.`);
-    await loadFromSupabase();
-  }
-}
-
-function dismissMigrate() {
-  document.getElementById('migrateBanner').classList.remove('show');
-  loadFromSupabase();
 }
 
 function toggleAuth(e) {
