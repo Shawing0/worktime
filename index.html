@@ -1548,7 +1548,7 @@ async function loadFromSupabase() {
     .from('sessions')
     .select('*')
     .eq('user_id', currentUser.id)
-    .order('created_at', { ascending: false });
+    .order('id', { ascending: false });
   if (error) {
     console.error('Supabase load error:', error.message);
     showToast('⚠️', 'Sync error', error.message);
