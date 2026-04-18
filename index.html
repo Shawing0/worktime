@@ -1136,15 +1136,15 @@ async function saveSession() {
   localStorage.setItem('rtsessions',JSON.stringify(sessions));
   renderHistory();
   if (currentUser) {
-    const {error} = await sb.from('sessions').insert({
+    const {data, error} = await sb.from('sessions').insert({
       user_id:currentUser.id, date:s.date, date_iso:s.dateISO,
       time:s.time, work:s.work, break:s.break
-    });
+    }).select('id').single();
     if (error) {
       console.error('Session save failed:', error.message);
       showToast('⚠️', 'Save failed', error.message);
-    } else {
-      sessions[0].dbId = `${currentUser.id}_${s.dateISO}_${s.time}`;
+    } else if (data) {
+      sessions[0].dbId = data.id;
       localStorage.setItem('rtsessions',JSON.stringify(sessions));
     }
   }
@@ -1161,12 +1161,8 @@ async function clearHistory() {
 }
 async function deleteSession(idx) {
   const s=sessions[idx];
-  if (currentUser && s.dateISO && s.time) {
-    await sb.from('sessions')
-      .delete()
-      .eq('user_id', currentUser.id)
-      .eq('date_iso', s.dateISO)
-      .eq('time', s.time);
+  if (currentUser && s.dbId) {
+    await sb.from('sessions').delete().eq('id', s.dbId).eq('user_id', currentUser.id);
   }
   sessions.splice(idx,1);
   localStorage.setItem('rtsessions',JSON.stringify(sessions));
@@ -1510,7 +1506,7 @@ function renderFocChart() {
    SUPABASE AUTH
 ═══════════════════════════════════════════ */
 const SUPA_URL = 'https://nzoxiqcguyilxttujdyw.supabase.co';
-const SUPA_KEY = 'sb_publishable_3zfAefBKmjpJguPH9Pp3zQ_Fi5XDCNM';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im56b3hpcWNndXlpbHh0dHVqZHl3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzOTYxMjcsImV4cCI6MjA5MTk3MjEyN30.9oLPfURlCSzBhWigjUuQdQUXyMM0ks8ZAzVDigt6qTY';
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 let currentUser = null;
 
@@ -1559,21 +1555,17 @@ async function loadFromSupabase() {
   const { data, error } = await sb
     .from('sessions')
     .select('*')
-    .eq('user_id', currentUser.id);
+    .eq('user_id', currentUser.id)
+    .order('id', { ascending: false });
   if (error) {
     console.error('Supabase load error:', error.message);
+    showToast('⚠️', 'Sync error', error.message);
     return;
   }
   if (data) {
-    data.sort((a, b) => {
-      const da = (a.date_iso||'') + ' ' + (a.time||'');
-      const db2 = (b.date_iso||'') + ' ' + (b.time||'');
-      return db2.localeCompare(da);
-    });
     sessions = data.map(r => ({
       date: r.date, dateISO: r.date_iso, time: r.time,
-      work: r.work, break: r.break,
-      dbId: `${r.user_id}_${r.date_iso}_${r.time}`
+      work: r.work, break: r.break, dbId: r.id
     }));
     localStorage.setItem('rtsessions', JSON.stringify(sessions));
     renderHistory();
